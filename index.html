@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sketch</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <script src="libraries/p5.min.js"></script>
+    <script src="libraries/p5.sound.min.js"></script>
+  </head>
+
+  <body>
+    <div id="sideMenu" class="side-menu" aria-hidden="true">
+      <nav>
+        <ul>
+          <li><a href="#" id="menu-work">第一單元作品</a></li>
+          <li><a href="#" id="menu-handout">第一單元講義</a></li>
+          <li><a href="#">測驗系統</a></li>
+          <li><a href="#">回到首頁</a></li>
+        </ul>
+      </nav>
+    </div>
+
+    <!-- iframe overlay (hidden by default) -->
+    <div id="iframeOverlay" class="iframe-overlay" aria-hidden="true">
+      <div class="iframe-backdrop"></div>
+      <div class="iframe-container" role="dialog" aria-modal="true">
+        <button id="iframeClose" class="iframe-close" aria-label="關閉">×</button>
+        <iframe id="contentIframe" src="" frameborder="0" allowfullscreen></iframe>
+      </div>
+    </div>
+    <script src="sketch.js"></script>
+  </body>
+</html>

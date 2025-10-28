@@ -1,0 +1,113 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+canvas {
+  display: block;
+}
+
+/* Side menu styles */
+#sideMenu {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 36px 24px;
+  background: rgba(20, 20, 20, 0.95);
+  color: #fff;
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+  z-index: 1000; /* sit above canvas */
+  display: flex;
+  align-items: center;
+}
+
+#sideMenu.open {
+  transform: translateX(0);
+}
+
+#sideMenu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#sideMenu li {
+  margin: 10px 0;
+  font-size: 32px; /* requested size */
+}
+
+#sideMenu a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+
+#sideMenu li a:hover {
+  color: #1E90FF; /* DodgerBlue-ish */
+  cursor: pointer;
+}
+
+/* ensure canvas stays underneath the menu */
+canvas {
+  z-index: 0;
+}
+
+/* iframe overlay styles */
+.iframe-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+.iframe-overlay.open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.iframe-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+}
+
+.iframe-container {
+  position: relative;
+  width: 70vw; /* 70% of viewport width */
+  height: 85vh; /* 85% of viewport height */
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  z-index: 2010;
+}
+
+.iframe-container iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.iframe-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2020;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  cursor: pointer;
+}
