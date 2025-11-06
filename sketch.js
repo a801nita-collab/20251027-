@@ -1,279 +1,470 @@
-let circles = [];
-let particles = []; // 新增粒子陣列
-
-// 新增：音效變數與備援旗標
-let popSound = null;
-let useSynth = false;
-
-const COLORS = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'];
-const NUM_CIRCLES = 20;
-
-// 新增：分數變數
-let score = 0;
+/*
+By Okazz
+*/
+let palette = ['#DE183C', '#F2B541', '#0C79BB', '#f0f0f0'];
+let ctx;
+let centerX, centerY;
+let movers = [];
+let cnv;
+let sideMenuEl;
+let menuWidth = 0;
+let menuOpen = false;
+let menuWorkEl;
+let iframeOverlayEl;
+let iframeEl;
+let iframeCloseBtn;
+let menuHandoutEl;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+	cnv = createCanvas(windowWidth, windowHeight);
+	// position canvas at the top-left and ensure it fills the window
+	cnv.position(0, 0);
+	// keep the canvas under the menu
+	cnv.style('z-index', '0');
+	cnv.style('display', 'block');
+	rectMode(CENTER);
+	colorMode(HSB, 360, 100, 100, 100);
+	ctx = drawingContext;
+	centerX = width / 2;
+	centerY = height / 2;
 
-  // 嘗試依序載入音檔（非阻塞）
-  tryLoadExternalPop([
-    'pop.mp3',
-    'pop.wav',
-    'libraries/pop.mp3',
-    'libraries/pop.wav'
-  ]);
+	// side menu element and interaction
+	sideMenuEl = document.getElementById('sideMenu');
+	if (sideMenuEl) {
+		// compute width once (will update on resize)
+		menuWidth = sideMenuEl.offsetWidth || 300;
 
-  // 解鎖瀏覽器音訊（第一次點擊）
-  const c = document.getElementsByTagName('canvas')[0];
-  if (c) {
-    c.addEventListener('click', () => {
-      if (typeof userStartAudio === 'function') {
-        userStartAudio().then(() => console.log('Audio unlocked'));
-      }
-    }, { once: true });
-  }
+		// open/close helpers
+		const openMenu = () => {
+			if (!menuOpen) {
+				sideMenuEl.classList.add('open');
+				sideMenuEl.setAttribute('aria-hidden', 'false');
+				menuOpen = true;
+			}
+		};
 
-  // 初始化圓（改為同時儲存 hex 字串以便比對）
-  circles = [];
-  for (let i = 0; i < NUM_CIRCLES; i++) {
-    const hex = random(COLORS);
-    circles.push({
-      x: random(width),
-      y: random(height),
-      r: random(50, 200),
-      hex: hex,
-      color: color(hex),
-      alpha: random(80, 255),
-      speed: random(1, 5),
-      exploded: false // 新增爆炸狀態
-    });
-  }
-}
+		const closeMenu = () => {
+			if (menuOpen) {
+				sideMenuEl.classList.remove('open');
+				sideMenuEl.setAttribute('aria-hidden', 'true');
+				menuOpen = false;
+			}
+		};
 
-function draw() {
-  background('#fcf6bd');
-  noStroke();
-  
-  // 更新和繪製粒子
-  for (let i = particles.length - 1; i >= 0; i--) {
-    let p = particles[i];
-    p.update();
-    p.display();
-    if (p.isDead()) {
-      particles.splice(i, 1);
-    }
-  }
+		// mousemove: show when cursor is within left 100px; hide when cursor far to the right
+		window.addEventListener('mousemove', (ev) => {
+			const x = ev.clientX;
+			if (x <= 100) {
+				openMenu();
+			} else if (x > menuWidth + 40) {
+				closeMenu();
+			}
+		});
 
-  for (let c of circles) {
-    if (!c.exploded) {
-      c.y -= c.speed;
-      
-      // 移除隨機爆炸：改為由使用者點擊觸發 explode(c)
-      if (c.y + c.r / 2 < 0) { // 如果圓完全移出畫面頂端
-        resetCircle(c);
-      }
-      
-      c.color.setAlpha(c.alpha);
-      fill(c.color);
-      circle(c.x, c.y, c.r);
+		// clicking outside the menu closes it
+		window.addEventListener('click', (ev) => {
+			if (!sideMenuEl.contains(ev.target) && ev.clientX > menuWidth + 40) {
+				closeMenu();
+			}
+		});
 
-      // 在圓的右上方1/4圓的中間產生方形
-      let squareSize = c.r / 6;
-      let angle = -PI / 4;
-      let distance = c.r / 2 * 0.65;
-      let squareCenterX = c.x + cos(angle) * distance;
-      let squareCenterY = c.y + sin(angle) * distance;
-      fill(255, 255, 255, 120);
-      noStroke();
-      rectMode(CENTER);
-      rect(squareCenterX, squareCenterY, squareSize, squareSize);
-    }
-  }
+		// update cached width on resize
+		window.addEventListener('resize', () => {
+			menuWidth = sideMenuEl.offsetWidth || 300;
+		});
+	}
 
-  // 左上角固定文字
-  noStroke();
-  fill('#9d4edd');
-  textSize(32);
-  textAlign(LEFT, TOP);
-  text('414730589', 10, 10);
+	// iframe overlay elements and handlers
+	menuWorkEl = document.getElementById('menu-work');
+	iframeOverlayEl = document.getElementById('iframeOverlay');
+	iframeEl = document.getElementById('contentIframe');
+	iframeCloseBtn = document.getElementById('iframeClose');
 
-  textAlign(RIGHT, TOP);
-  text('Score: ' + score, width - 10, 10);
-}
+	const openIframe = (url) => {
+		if (!iframeOverlayEl || !iframeEl) return;
+		iframeEl.src = url;
+		iframeOverlayEl.classList.add('open');
+		iframeOverlayEl.setAttribute('aria-hidden', 'false');
+	};
 
-// 重置圓形（同步設定 hex 與 color）
-function resetCircle(c) {
-  c.y = height + c.r / 2;
-  c.x = random(width);
-  c.r = random(50, 200);
-  const hex = random(COLORS);
-  c.hex = hex;
-  c.color = color(hex);
-  c.alpha = random(80, 255);
-  c.speed = random(1, 5);
-  c.exploded = false;
-}
+	const closeIframe = () => {
+		if (!iframeOverlayEl || !iframeEl) return;
+		iframeOverlayEl.classList.remove('open');
+		iframeOverlayEl.setAttribute('aria-hidden', 'true');
+		// clear src after transition to stop any media
+		setTimeout(() => { iframeEl.src = ''; }, 350);
+	};
 
-// 更新：點擊才爆破（explode 現在會標記並在短延遲後重置）
-function explode(circle) {
-  let numParticles = 50;
-  for (let i = 0; i < numParticles; i++) {
-    let angle = random(TWO_PI);
-    let speed = random(2, 8);
-    let r = random(5, 15);
-    particles.push(new Particle(
-      circle.x,
-      circle.y,
-      speed * cos(angle),
-      speed * sin(angle),
-      r,
-      circle.color
-    ));
-  }
+	if (menuWorkEl) {
+		menuWorkEl.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			openIframe('https://a801nita-collab.github.io/123456/');
+		});
+	}
 
-  // 播放 pop 音效（若無檔案則用合成器備援）
-  playPopSound();
+	// 第一單元講義：在 iframe 中開啟 HackMD 文件
+	menuHandoutEl = document.getElementById('menu-handout');
+	if (menuHandoutEl) {
+		menuHandoutEl.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			openIframe('https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/BJbxv7Ajel');
+		});
+	}
 
-  // 標記為已爆炸並在短延遲後重置（讓粒子能播放）
-  circle.exploded = true;
-  setTimeout(() => {
-    resetCircle(circle);
-  }, 800); // 0.8s 後重生，可依需求調整
-}
+	// 測驗系統
+	const menuQuizEl = document.getElementById('menu-quiz');
+	if (menuQuizEl) {
+		menuQuizEl.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			openIframe(' https://a801nita-collab.github.io/20251103-anita/');
+		});
+	}
 
-// 新增：非同步嘗試載入多個路徑
-function loadSoundAsync(url) {
-  return new Promise((resolve, reject) => {
-    if (typeof loadSound !== 'function') {
-      reject(new Error('p5.sound not available'));
-      return;
-    }
-    loadSound(url, (s) => resolve(s), (err) => reject(err));
-  });
-}
+	// 測驗系統筆記
+	const menuQuizNotesEl = document.getElementById('menu-quiz-notes');
+	if (menuQuizNotesEl) {
+		menuQuizNotesEl.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			openIframe('https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/rJKNvcK1Wg');
+		});
+	}
 
-async function tryLoadExternalPop(list) {
-  if (typeof loadSound !== 'function') {
-    console.warn('p5.sound not found — using synth fallback');
-    useSynth = true;
-    return;
-  }
-  for (const url of list) {
-    try {
-      const s = await loadSoundAsync(url);
-      popSound = s;
-      useSynth = false;
-      console.log('Loaded pop sound from:', url);
-      return;
-    } catch (err) {
-      console.warn('Failed to load pop from', url);
-    }
-  }
-  console.warn('All pop loads failed — using synth fallback');
-  useSynth = true;
-}
+	// 作品筆記
+	const menuWorkNotesEl = document.getElementById('menu-work-notes');
+	if (menuWorkNotesEl) {
+		menuWorkNotesEl.addEventListener('click', (ev) => {
+			ev.preventDefault();
+			openIframe('https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/rJKNvcK1Wg');
+		});
+	}
 
-// 新增：播放音效，若檔案未載入則用 p5 合成器
-function playPopSound() {
-  try {
-    if (!useSynth && popSound && typeof popSound.isLoaded === 'function' && popSound.isLoaded()) {
-      popSound.play();
-      return;
-    }
-  } catch (e) {
-    console.warn('popSound play failed, using synth', e);
-  }
+	if (iframeCloseBtn) {
+		iframeCloseBtn.addEventListener('click', (ev) => {
+			ev.stopPropagation();
+			closeIframe();
+		});
+	}
 
-  // synth fallback
-  if (typeof p5 !== 'undefined' && typeof p5.Oscillator === 'function') {
-    let osc = new p5.Oscillator('triangle');
-    let noise = new p5.Noise('white');
-    let env = new p5.Envelope();
-    env.setADSR(0.001, 0.06, 0.0, 0.12);
-    env.setRange(0.7, 0);
-
-    osc.freq(random(700, 1200));
-    osc.amp(0);
-    osc.start();
-
-    noise.amp(0);
-    noise.start();
-
-    let noiseEnv = new p5.Envelope();
-    noiseEnv.setADSR(0.001, 0.05, 0.0, 0.08);
-    noiseEnv.setRange(0.25, 0);
-
-    env.play(osc);
-    noiseEnv.play(noise);
-
-    setTimeout(() => {
-      try { osc.stop(); } catch (e) {}
-      try { noise.stop(); } catch (e) {}
-    }, 300);
-  }
-}
-
-// 粒子類別
-class Particle {
-  constructor(x, y, vx, vy, r, color) {
-    this.x = x;
-    this.y = y;
-    this.vx = vx;
-    this.vy = vy;
-    this.r = r;
-    this.color = color;
-    this.life = 255;
-    this.decay = random(2, 4);
-  }
-
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vy += 0.1; // 重力效果
-    this.life -= this.decay;
-  }
-
-  display() {
-    noStroke();
-    this.color.setAlpha(this.life);
-    fill(this.color);
-    circle(this.x, this.y, this.r);
-  }
-
-  isDead() {
-    return this.life < 0;
-  }
+	// click backdrop to close
+	if (iframeOverlayEl) {
+		iframeOverlayEl.addEventListener('click', (ev) => {
+			if (ev.target === iframeOverlayEl || ev.target.classList.contains('iframe-backdrop')) {
+				closeIframe();
+			}
+		});
+	}
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  for (let c of circles) {
-    c.x = random(width);
-    c.y = random(height);
-  }
+	// resize canvas and update any cached dimensions
+	resizeCanvas(windowWidth, windowHeight);
+	centerX = width / 2;
+	centerY = height / 2;
 }
 
-// 點擊氣球才會產生爆炸與加分
-function mousePressed() {
-  // 檢查最上層（由後往前）
-  for (let i = circles.length - 1; i >= 0; i--) {
-    const c = circles[i];
-    if (!c.exploded) {
-      const d = dist(mouseX, mouseY, c.x, c.y);
-      // c.r 在此程式代表直徑，半徑用 c.r/2
-      if (d <= c.r / 2) {
-        // 播放爆炸、產生粒子（explode 會標記並在稍後重置）
-        explode(c);
+function draw() {
+	background('#000000');
+	for (let i of movers) {
+		i.run();
+	}
+	for (let i = 0; i < movers.length; i++) {
+		if (movers[i].isDead) {
+			movers.splice(i, 1);
+		}
+	}
 
-        // 加分規則：按到 #6a4c93 顏色加 1，其他顏色扣 1
-        if ((c.hex || '').toLowerCase() === '#6a4c93') {
-          score += 1;
-        } else {
-          score -= 1;
-        }
+	if (frameCount % int(random(80)) == 0) {
+		addMovers();
+	}
 
-        break; // 一次只處理一個氣球
-      }
-    }
-  }
 }
 
+
+
+function addMovers() {
+	let x = random(width);
+	let y = random(height);
+	let num = int(random(1, 20));
+	for (let i = 0; i < num; i++) {
+		movers.push(new Mover01(x, y));
+		movers.push(new Mover02(x, y));
+		movers.push(new Mover03(x, y));
+		movers.push(new Mover04(x, y));
+		movers.push(new Mover05(x, y));
+	}
+}
+
+function easeInOutCubic(x) {
+	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+/*------------------------------------------------------------------------------------------*/
+
+class Mover01 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+		this.lifeSpan = int(random(40, 130));
+		this.life = this.lifeSpan;
+		this.isDead = false;
+		this.maxLength = random(0.05, 0.2) * width;
+		this.direction = random(TAU);
+		this.curX1 = 0;
+		this.curX2 = 0;
+		this.clr = random(palette);
+		this.maxWingSize = width * 0.01;
+		this.wing = 0;
+	}
+
+	show() {
+		push();
+		translate(this.x, this.y);
+		rotate(this.direction);
+		stroke(this.clr);
+		strokeWeight(width * 0.002);
+		line(this.curX1, 0, this.curX2, 0);
+		line(this.curX1, 0, this.curX1 - this.wing, this.wing);
+		line(this.curX1, 0, this.curX1 - this.wing, -this.wing);
+		pop();
+	}
+
+	update() {
+
+		let nrm = norm(this.life, this.lifeSpan, 0);
+		this.curX1 = lerp(0, this.maxLength, nrm ** 0.6);
+		this.curX2 = lerp(0, this.maxLength, nrm ** 5);
+		this.wing = lerp(0, this.maxWingSize, sin(nrm * PI));
+		this.life--;
+
+		if (this.life < 0) {
+			this.isDead = true;
+		}
+	}
+
+	run() {
+		this.show();
+		this.update();
+	}
+}
+
+/*------------------------------------------------------------------------------------------*/
+
+class Mover02 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+		this.lifeSpan = int(random(40, 120));
+		this.life = this.lifeSpan;
+		this.isDead = false;
+		this.maxLength = random(0.05, 0.3) * width;
+		this.direction = random(TAU);
+		this.curX = this.x;
+		this.curY = this.y;
+
+		this.tgtX = this.x + this.maxLength * cos(this.direction);
+		this.tgtY = this.y + this.maxLength * sin(this.direction);
+		this.clr = random(palette);
+		this.maxShapeSize = width * random(0.02, 0.005);
+		this.shapeSize = 0;
+
+		this.ang = random(TAU);
+		this.angVel = random([-1, 1]) * random(0.09, 0.01);
+	}
+
+	show() {
+		push();
+		translate(this.curX, this.curY);
+		rotate(this.ang);
+		noStroke();
+		fill(this.clr);
+		beginShape();
+		for (let i = 0; i < 10; i++) {
+			let a = map(i, 0, 10, 0, TAU);
+			let r = this.shapeSize;
+			if (i % 2 == 0) {
+				r *= 0.5;
+			}
+			vertex(r * cos(a), r * sin(a));
+		}
+		endShape();
+		pop();
+	}
+
+	update() {
+
+		let nrm = norm(this.life, this.lifeSpan, 0);
+		this.curX = lerp(this.x, this.tgtX, nrm ** 0.5);
+		this.curY = lerp(this.y, this.tgtY, nrm ** 0.5);
+		this.shapeSize = lerp(0, this.maxShapeSize, sin(nrm * PI));
+		this.ang += this.angVel;
+		this.life--;
+
+		if (this.life < 0) {
+			this.isDead = true;
+		}
+	}
+
+	run() {
+		this.show();
+		this.update();
+	}
+}
+
+/*------------------------------------------------------------------------------------------*/
+
+class Mover03 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+		this.lifeSpan = int(random(60, 100));
+		this.life = this.lifeSpan;
+		this.isDead = false;
+		this.maxLength = random(0.05, 0.3) * width;
+		this.direction = random(TAU);
+		this.curX = 0;
+		this.tgtX = random(0.05, 0.3) * width;
+
+		this.clr = color(random(palette));
+		this.maxcircleD = width * random(0.03, 0.01);
+		this.circleW = 0;
+		this.circleH = 0;
+		this.alp = 100;
+	}
+
+	show() {
+		push();
+		translate(this.x, this.y);
+		rotate(this.direction);
+		noStroke();
+		this.clr.setAlpha(this.alp);
+		fill(this.clr);
+		ellipse(this.curX, 0, this.circleW, this.circleH);
+		pop();
+	}
+
+	update() {
+		let nrm = norm(this.life, this.lifeSpan, 0);
+		this.circleW = lerp(0, this.maxcircleD, nrm ** 0.5);
+		this.circleH = lerp(0, this.maxcircleD, nrm ** 2);
+		this.curX = lerp(0, this.maxLength, easeInOutCubic(nrm));
+		this.alp = lerp(100, 0, easeInOutCubic(nrm ** 8));
+		this.life--;
+
+		if (this.life < 0) {
+			this.isDead = true;
+		}
+	}
+
+	run() {
+		this.show();
+		this.update();
+	}
+}
+
+/*------------------------------------------------------------------------------------------*/
+
+class Mover04 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+		this.lifeSpan = int(random(60, 100));
+		this.life = this.lifeSpan;
+		this.isDead = false;
+		this.direction = random(4);
+		this.pos = [];
+		this.clr = random(palette);
+		this.maxWeight = width * 0.002;
+		this.weight = 0;
+
+		this.posLimit = 30;
+
+		this.initialValue = random(42937847294729);
+		this.noiseScl = 1200;
+		this.noiseStr = 300;
+		this.step = random(1, 5);
+	}
+
+	show() {
+		noFill();
+		strokeWeight(this.weight);
+		stroke(this.clr);
+		beginShape();
+		for (let i = 0; i < this.pos.length; i++) {
+			vertex(this.pos[i].x, this.pos[i].y);
+		}
+		endShape();
+
+		this.pos.push(createVector(this.x, this.y));
+
+		if (this.pos.length >= this.posLimit) {
+			this.pos.splice(0, 1);
+		}
+	}
+
+	update() {
+		let nrm = norm(this.life, this.lifeSpan, 0);
+		let ang = noise(this.x / this.noiseScl, this.y / this.noiseScl, this.initialValue) * this.noiseStr;
+		this.x += this.step * cos(ang);
+		this.y += this.step * sin(ang);
+		this.weight = lerp(0, this.maxWeight, sin(nrm * PI));
+		this.life--;
+
+		if (this.life < 0) {
+			this.isDead = true;
+		}
+	}
+
+	run() {
+		this.show();
+		this.update();
+	}
+}
+
+/*------------------------------------------------------------------------------------------*/
+
+class Mover05 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+		this.lifeSpan = int(random(40, 80));
+		this.life = this.lifeSpan;
+		this.isDead = false;
+		this.direction = random(4);
+		this.clr = random(palette);
+
+		this.ang = random(TAU);
+		this.angVel = random([-1, 1]) * random(0.15, 0.005);
+
+		this.cirX = 0;
+		this.cirD = 0;
+		this.maxCirX = width * random(0.05, 0.15);
+		this.maxCirD = width * random(0.01, 0.03);
+	}
+
+	show() {
+		push();
+		translate(this.x, this.y);
+		rotate(this.ang);
+		noStroke();
+		fill(this.clr);
+		ellipse(this.cirX, 0, this.cirD / 2, this.cirD);
+		pop();
+	}
+
+	update() {
+		let nrm = norm(this.life, this.lifeSpan, 0);
+		this.ang += this.angVel;
+		this.cirX = lerp(0, this.maxCirX, nrm);
+		this.cirD = lerp(0, this.maxCirD, sin(nrm * PI));
+
+		this.life--;
+		if (this.life < 0) {
+			this.isDead = true;
+		}
+	}
+
+	run() {
+		this.show();
+		this.update();
+	}
+}
