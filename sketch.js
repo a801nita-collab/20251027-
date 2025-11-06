@@ -9,11 +9,6 @@ let cnv;
 let sideMenuEl;
 let menuWidth = 0;
 let menuOpen = false;
-let menuWorkEl;
-let iframeOverlayEl;
-let iframeEl;
-let iframeCloseBtn;
-let menuHandoutEl;
 
 function setup() {
 	cnv = createCanvas(windowWidth, windowHeight);
@@ -75,10 +70,9 @@ function setup() {
 	}
 
 	// iframe overlay elements and handlers
-	menuWorkEl = document.getElementById('menu-work');
-	iframeOverlayEl = document.getElementById('iframeOverlay');
-	iframeEl = document.getElementById('contentIframe');
-	iframeCloseBtn = document.getElementById('iframeClose');
+	const iframeOverlayEl = document.getElementById('iframeOverlay');
+	const iframeEl = document.getElementById('contentIframe');
+	const iframeCloseBtn = document.getElementById('iframeClose');
 
 	const openIframe = (url) => {
 		if (!iframeOverlayEl || !iframeEl) return;
@@ -93,23 +87,22 @@ function setup() {
 		iframeOverlayEl.setAttribute('aria-hidden', 'true');
 		// clear src after transition to stop any media
 		setTimeout(() => { iframeEl.src = ''; }, 350);
+	}
+
+	// Helper to set up iframe links
+	const setupIframeLink = (elementId, url) => {
+		const element = document.getElementById(elementId);
+		if (element) {
+			element.addEventListener('click', (ev) => {
+			ev.preventDefault();
+				openIframe(url);
+			});
+		}
 	};
 
-	if (menuWorkEl) {
-		menuWorkEl.addEventListener('click', (ev) => {
-			ev.preventDefault();
-			openIframe('https://a801nita-collab.github.io/20251020/');
-		});
-	}
-
-	// 第一單元講義：在 iframe 中開啟 HackMD 文件
-	menuHandoutEl = document.getElementById('menu-handout');
-	if (menuHandoutEl) {
-		menuHandoutEl.addEventListener('click', (ev) => {
-			ev.preventDefault();
-			openIframe('https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/BJbxv7Ajel');
-		});
-	}
+	setupIframeLink('menu-work', 'https://a801nita-collab.github.io/20251020/');
+	setupIframeLink('menu-handout', 'https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/BJbxv7Ajel');
+	setupIframeLink('menu-quiz', 'https://a801nita-collab.github.io/20251103-anita/');
 
 	if (iframeCloseBtn) {
 		iframeCloseBtn.addEventListener('click', (ev) => {
