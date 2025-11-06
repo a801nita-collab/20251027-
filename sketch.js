@@ -101,8 +101,10 @@ function setup() {
 	};
 
 	setupIframeLink('menu-work', 'https://a801nita-collab.github.io/20251020/');
-	setupIframeLink('menu-handout', 'https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/BJbxv7Ajel');
+	setupIframeLink('menu-handout', 'https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/BJbxv7Ajel/');
 	setupIframeLink('menu-quiz', 'https://a801nita-collab.github.io/20251103-anita/');
+	setupIframeLink('menu-quiz-notes', 'https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/rJKNvcK1Wg');
+	setupIframeLink('menu-work-notes', 'https://hackmd.io/@8R3rNBC5Tz2EDJ4XvI1alQ/rJKNvcK1Wg');
 
 	if (iframeCloseBtn) {
 		iframeCloseBtn.addEventListener('click', (ev) => {
